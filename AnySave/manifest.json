@@ -1,0 +1,10 @@
+﻿{
+  "Name": "AnySave",
+  "Author": "su226",
+  "Version": "1.0.0",
+  "Description": "Save anytime and anywhere!",
+  "UniqueID": "Su226.AnySave",
+  "EntryDll": "AnySave.dll",
+  "MinimumApiVersion": "3.0.0",
+  "UpdateKeys": []
+}
