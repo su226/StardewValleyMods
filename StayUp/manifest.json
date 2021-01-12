@@ -6,5 +6,5 @@
   "UniqueID": "Su226.StayUp",
   "EntryDll": "StayUp.dll",
   "MinimumApiVersion": "3.0.0",
-  "UpdateKeys": []
+  "UpdateKeys": ["Nexus:7592"]
 }
