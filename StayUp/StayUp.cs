@@ -10,8 +10,7 @@ using StardewValley.Characters;
 namespace Su226.StayUp {
   public class StayUp : Mod {
     private Config config;
-    private int morningBegin;
-    private int morningDuration;
+    private LightTransition light;
 
     private bool canCallNewDay; // Prevent sleep repeatedly.
     private bool restoreData;
@@ -28,21 +27,12 @@ namespace Su226.StayUp {
     private Vector2 horsePos;
     private int horseFacing;
 
-    private Color lightColor = Color.Transparent;
-    private Color darkColor = new Color(237, 237, 0, 237);
-    private Color rainLightColor = new Color(76, 60, 24, 76);
-    private Color rainDarkColor = new Color(237, 186, 74, 237);
-    private Color outdoorLight;
-
     public override void Entry(IModHelper helper) {
       this.Monitor.Log("Starting.");
       this.config = helper.ReadConfig<Config>();
-      this.morningBegin = this.config.morningLight / 100 * 60 + this.config.morningLight % 100;
-      this.morningDuration = 360 - this.morningBegin;
 
       helper.Events.GameLoop.DayStarted += this.OnDayStarted;
       helper.Events.GameLoop.TimeChanged += this.OnTimeChanged;
-      helper.Events.GameLoop.UpdateTicked += this.OnUpdateTicked;
 
       HarmonyInstance harmony = HarmonyInstance.Create(this.ModManifest.UniqueID);
       if (this.config.noTiredEmote) {
@@ -57,6 +47,10 @@ namespace Su226.StayUp {
       if (this.config.editFishes) {
         this.Monitor.Log("Fish editing enabled.");
         helper.Content.AssetEditors.Add(new FishEditor(this.Monitor));
+      }
+
+      if (this.config.morningLight != -1) {
+        this.light = new LightTransition(helper, this.config);
       }
     }
 
@@ -105,7 +99,7 @@ namespace Su226.StayUp {
         this.restoreData = false;
       }
       this.canCallNewDay = false;
-      this.outdoorLight = Game1.isRaining ? this.rainLightColor : this.lightColor;
+      this.light?.UseLightColor();
     }
 
     private void OnTimeChanged(object o, TimeChangedEventArgs e) {
@@ -116,30 +110,12 @@ namespace Su226.StayUp {
       if (Game1.timeOfDay == 2550 && this.config.stayUp) {
         this.Monitor.Log("Stay up.");
         this.canCallNewDay = this.config.newDayAt6Am;
-        this.outdoorLight = Game1.isRaining ? this.rainDarkColor : this.darkColor;
+        this.light?.UseDarkColor();
         Game1.timeOfDay = 150;
-      }
-      if (e.NewTime > this.config.morningLight && e.NewTime <= 600) {
-        double d = e.NewTime / 100 * 60 + e.NewTime % 100 - this.morningBegin;
-        this.outdoorLight = this.GetAverageColor(
-          Game1.isRaining ? this.rainLightColor : this.lightColor,
-          Game1.isRaining ? this.rainDarkColor : this.darkColor,
-          Math.Pow(d / this.morningDuration, this.config.morningLightPower)
-        );
       }
       if (e.NewTime == 600 && this.canCallNewDay) {
         this.NewDayStayUp();
       }
-    }
-
-    private Color GetAverageColor(Color c1, Color c2, double ratio1) {
-      double ratio2 = 1 - ratio1;
-      return new Color(
-        (byte)(c1.R * ratio1 + c2.R * ratio2),
-        (byte)(c1.G * ratio1 + c2.G * ratio2),
-        (byte)(c1.B * ratio1 + c2.B * ratio2),
-        (byte)(c1.A * ratio1 + c2.A * ratio2)
-      );
     }
 
     private void NewDayStayUp() {
@@ -171,12 +147,6 @@ namespace Su226.StayUp {
       } else {
         Game1.NewDay(0f);
         Game1.fadeToBlackAlpha = this.config.smoothSaving ? 0 : 1.2f;
-      }
-    }
-
-    private void OnUpdateTicked(object o, UpdateTickedEventArgs e) {
-      if (Game1.timeOfDay <= 600) { // Keep correct light when rain
-        Game1.outdoorLight = this.outdoorLight;
       }
     }
   }
