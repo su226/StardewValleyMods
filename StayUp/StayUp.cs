@@ -36,7 +36,7 @@ namespace Su226.StayUp {
 
       HarmonyInstance harmony = HarmonyInstance.Create(this.ModManifest.UniqueID);
       if (this.config.noTiredEmote) {
-        this.Monitor.Log("Tired emote supression enabled.");
+        this.Monitor.Log("Tired emote supression enabled. (Requires patching game code)", LogLevel.Info);
         FarmerPatches.Init(this.Monitor);
         harmony.Patch(
           AccessTools.Method(typeof(Farmer), "doEmote", new Type[] { typeof(int) }),
@@ -50,7 +50,8 @@ namespace Su226.StayUp {
       }
 
       if (this.config.morningLight != -1) {
-        this.light = new LightTransition(helper, this.config);
+        this.Monitor.Log("Light transition enabled.");
+        this.light = new LightTransition(helper, this.Monitor, this.config);
       }
     }
 
@@ -99,7 +100,6 @@ namespace Su226.StayUp {
         this.restoreData = false;
       }
       this.canCallNewDay = false;
-      this.light?.UseLightColor();
     }
 
     private void OnTimeChanged(object o, TimeChangedEventArgs e) {
@@ -110,7 +110,6 @@ namespace Su226.StayUp {
       if (Game1.timeOfDay == 2550 && this.config.stayUp) {
         this.Monitor.Log("Stay up.");
         this.canCallNewDay = this.config.newDayAt6Am;
-        this.light?.UseDarkColor();
         Game1.timeOfDay = 150;
       }
       if (e.NewTime == 600 && this.canCallNewDay) {
