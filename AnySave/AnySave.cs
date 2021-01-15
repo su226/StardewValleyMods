@@ -2,21 +2,32 @@
 using StardewModdingAPI;
 using StardewModdingAPI.Events;
 using StardewValley;
+using StardewValley.Menus;
 using System.Collections.Generic;
+using System.IO;
+using System.Xml.Serialization;
 
 namespace Su226.AnySave {
+  class M {
+    public static IModHelper Helper;
+    public static IMonitor Monitor;
+  }
   class AnySave : Mod {
     public Config config;
 
+    private bool isModdedSave;
     private SaveData saveData;
 
     public override void Entry(IModHelper helper) {
       this.config = helper.ReadConfig<Config>();
+      M.Helper = Helper;
+      M.Monitor = Monitor;
 
       helper.Events.Input.ButtonPressed += this.OnButtonPressed;
-      helper.Events.GameLoop.Saving += this.OnSaving;
-      helper.Events.GameLoop.SaveLoaded += this.OnSaveLoaded;
       helper.Events.Multiplayer.ModMessageReceived += this.OnModMessageReceived;
+      helper.Events.GameLoop.Saving += this.OnSaving;
+      helper.Events.GameLoop.Saved += this.OnSaved;
+      helper.Events.GameLoop.SaveLoaded += this.OnSaveLoaded;
     }
 
     private void OnButtonPressed(object o, ButtonPressedEventArgs e) {
@@ -35,78 +46,26 @@ namespace Su226.AnySave {
         Monitor.Log("Can't save: Menu open");
         return;
       }
-      if (!Game1.IsMasterGame) {
-        Game1.addHUDMessage(new HUDMessage(
-          Helper.Translation.Get("Su226.AnySave.requestSent"),
-          HUDMessage.newQuest_type
-        ));
-        Helper.Multiplayer.SendMessage(
-          Game1.player.UniqueMultiplayerID,
-          "Su226.AnySave.Request",
-          new string[] { "Su226.AnySave" },
-          new long[] { Game1.MasterPlayer.UniqueMultiplayerID }
-        );
-        return;
+      this.isModdedSave = true;
+      if (Game1.IsMultiplayer) {
+        Game1.activeClickableMenu = new ReadyCheckDialog("anysave", true, delegate {
+          this.isModdedSave = true;
+          Game1.newDaySync = new NewDaySynchronizer();
+          Game1.activeClickableMenu = new SaveGameMenu();
+          Game1.player.team.SetLocalReady("anysave", false);
+        });
+      } else {
+        this.isModdedSave = true;
+        Game1.newDaySync = new NewDaySynchronizer();
+        Game1.activeClickableMenu = new SaveGameMenu();
       }
-      // Save all NPCs.
-      Dictionary<string, CharacterData> characters = new Dictionary<string, CharacterData>();
-      foreach (GameLocation l in Game1.locations) {
-        foreach (NPC c in l.characters) {
-          string key = c.DefaultMap + c.Name;
-          Monitor.Log(string.Format("Save NPC {0}", key));
-          characters[key] = new CharacterData {
-            map = c.currentLocation.NameOrUniqueName,
-            x = c.position.X,
-            y = c.position.Y,
-            facing = c.facingDirection
-          };
-        }
-      }
-      // Save all players.
-      Dictionary<long, FarmerData> farmers = new Dictionary<long, FarmerData>();
-      foreach (Farmer f in Game1.getAllFarmers()) {
-        Monitor.Log(string.Format("Save player {0}({1})", f.name, f.uniqueMultiplayerID));
-        if (f.mount != null) {
-          characters[f.mount.Name] = new CharacterData {
-            map = f.currentLocation.NameOrUniqueName,
-            x = f.position.X,
-            y = f.position.Y,
-            facing = f.facingDirection
-          };
-        }
-        farmers[f.uniqueMultiplayerID] = new FarmerData {
-          map = f.currentLocation.NameOrUniqueName,
-          x = f.position.X,
-          y = f.position.Y,
-          facing = f.facingDirection,
-          swimSuit = f.bathingClothes,
-          swimming = f.swimming,
-          horse = f.mount?.Name
-        };
-      }
-      // Write data and save.
-      Helper.Data.WriteSaveData("AnySave", new SaveData {
-        character = characters,
-        farmer = farmers,
-        time = Game1.timeOfDay
-      });
-      Multiplayer mp = Helper.Reflection.GetField<Multiplayer>(typeof(Game1), "multiplayer").GetValue();
-      if (mp != null) {
-        Monitor.Log("Saving Farmhands.");
-        mp.saveFarmhands();
-      }
-      Monitor.Log("Saving.");
-      for (IEnumerator<int> saver = SaveGame.getSaveEnumerator(); saver.MoveNext(););
-      // Show saved to all players.
-      this.ShowSaved();
-      Helper.Multiplayer.SendMessage("", "Su226.AnySave.ShowSaved", new string[] { "Su226.AnySave" });
     }
 
     private void OnModMessageReceived(object o, ModMessageReceivedEventArgs e) {
       switch (e.Type) {
       case "Su226.AnySave.GetFarmerData":
         long id = e.ReadAs<long>();
-        if ((bool)this.saveData?.farmer.ContainsKey(id)) {
+        if (this.saveData != null && this.saveData.farmer.ContainsKey(id)) {
           Monitor.Log(string.Format("Send player {0} to {1}.", id, e.FromPlayerID));
           Helper.Multiplayer.SendMessage(
             this.saveData.farmer[id],
@@ -120,26 +79,96 @@ namespace Su226.AnySave {
         break;
       case "Su226.AnySave.ReceiveFarmerData":
         Monitor.Log(string.Format("Received player from host."));
-        this.RestorePlayerData(e.ReadAs<FarmerData>());
-        break;
-      case "Su226.AnySave.Request":
-        Game1.addHUDMessage(new HUDMessage(
-          Helper.Translation.Get("Su226.AnySave.requestReceived", new {
-            name = Game1.getFarmer(e.ReadAs<long>()).Name
-          }),
-          HUDMessage.newQuest_type
-        ));
-        break;
-      case "Su226.AnySave.ShowSaved":
-        this.ShowSaved();
+        this.RestotePlayer(e.ReadAs<FarmerData>());
         break;
       }
     }
 
     private void OnSaving(object o, SavingEventArgs e) {
+      if (!Game1.IsMasterGame) {
+        return;
+      }
       // Erase data if saved without mod.
-      Monitor.Log("Erasing.");
-      Helper.Data.WriteSaveData<SaveData>("AnySave", null);
+      if (!this.isModdedSave) {
+        Monitor.Log("Erasing.");
+        Helper.Data.WriteSaveData<SaveData>("AnySave", null);
+      }
+      // Save all NPCs.
+      Dictionary<string, CharacterData> characters = new Dictionary<string, CharacterData>();
+      foreach (GameLocation l in Game1.locations) {
+        foreach (NPC c in l.characters) {
+          string key = c.DefaultMap + c.Name;
+          Monitor.Log(string.Format("Save NPC {0}", key));
+          PathData target = null;
+          if (c.controller != null) {
+            Point[] points = c.controller.pathToEndPoint.ToArray();
+            if (points.Length != 0) {
+              Point endPoint = points[points.Length - 1];
+              target = new PathData {
+                map = c.controller.location.NameOrUniqueName,
+                x = endPoint.X,
+                y = endPoint.Y,
+                facing = c.controller.finalFacingDirection
+              };
+            }
+          }
+          characters[key] = new CharacterData {
+            map = c.currentLocation.NameOrUniqueName,
+            x = c.position.X,
+            y = c.position.Y,
+            facing = c.facingDirection,
+            target = target,
+            queued = c.queuedSchedulePaths.ConvertAll(i => i.Key).ToArray()
+          };
+        }
+      }
+      // Save all players.
+      Dictionary<long, FarmerData> farmers = new Dictionary<long, FarmerData>();
+      foreach (Farmer f in Game1.getAllFarmers()) {
+        if (f.mount != null) {
+          Monitor.Log(string.Format("Save mounted horse {0}", f.mount.Name));
+          characters[f.mount.Name] = new CharacterData {
+            map = f.currentLocation.NameOrUniqueName,
+            x = f.position.X,
+            y = f.position.Y,
+            facing = f.facingDirection,
+            queued = new int[0]
+          };
+        }
+        Monitor.Log(string.Format("Save player {0}", f.uniqueMultiplayerID));
+        farmers[f.uniqueMultiplayerID] = new FarmerData {
+          map = f.currentLocation.NameOrUniqueName,
+          x = f.position.X,
+          y = f.position.Y,
+          facing = f.facingDirection,
+          swimSuit = f.bathingClothes,
+          swimming = f.swimming,
+          horse = f.mount?.Name
+        };
+      }
+      // Save shipping bin
+      Dictionary<long, string[]> shippingBins = new Dictionary<long, string[]>();
+      if (Game1.player.team.useSeparateWallets) {
+        foreach (Farmer f in Game1.getAllFarmers()) {
+          shippingBins[f.UniqueMultiplayerID] = this.SaveShippingBin(f.personalShippingBin);
+        }
+      } else {
+        shippingBins[-1] = this.SaveShippingBin(Game1.getFarm().getShippingBin(Game1.player));
+      }
+      // Write data.
+      Helper.Data.WriteSaveData("AnySave", new SaveData {
+        character = characters,
+        farmer = farmers,
+        ship = shippingBins,
+        time = Game1.timeOfDay
+      });
+      this.isModdedSave = false;
+    }
+
+    private void OnSaved(object o, SavedEventArgs e) {
+      // Reset ready or it will stuck
+      Game1.player.team.SetLocalReady("ready_for_save", false);
+      Game1.player.team.SetLocalReady("wakeup", false);
     }
 
     private void OnSaveLoaded(object o, SaveLoadedEventArgs e) {
@@ -163,9 +192,19 @@ namespace Su226.AnySave {
       Game1.timeOfDay = this.saveData.time;
       // Restore master player
       if (this.saveData.farmer.ContainsKey(Game1.player.uniqueMultiplayerID)) {
-        this.RestorePlayerData(this.saveData.farmer[Game1.player.uniqueMultiplayerID]);
+        this.RestotePlayer(this.saveData.farmer[Game1.player.uniqueMultiplayerID]);
       } else {
-        Monitor.Log(string.Format("Can't find player {0}({1})", Game1.player.name, Game1.player.uniqueMultiplayerID));
+        Monitor.Log(string.Format("Can't find player {1}", Game1.player.uniqueMultiplayerID));
+      }
+      // Restore shipping bin
+      if (Game1.player.team.useSeparateWallets) {
+        foreach (Farmer i in Game1.getAllFarmers()) {
+          Monitor.Log(string.Format("Restore {0}'s shipping bin", i.uniqueMultiplayerID));
+          this.RestoreShippingBin(i.personalShippingBin, this.saveData.ship[i.UniqueMultiplayerID]);
+        }
+      } else {
+        Monitor.Log("Restore shared shipping bin");
+        this.RestoreShippingBin(Game1.getFarm().getShippingBin(Game1.player), this.saveData.ship[-1]);
       }
       // Restore all NPCs
       List<NPC> npcs = new List<NPC>();
@@ -179,28 +218,56 @@ namespace Su226.AnySave {
           CharacterData data2 = this.saveData.character[key];
           Game1.warpCharacter(c, data2.map, new Vector2(data2.x / 64, data2.y / 64));
           c.faceDirection(data2.facing);
+          if (data2.target != null) {
+            Monitor.Log("Restore pathfind data.");
+            c.controller = new PathFindController(
+              c,
+              Game1.getLocationFromName(data2.target.map),
+              new Point(data2.target.x, data2.target.y),
+              data2.target.facing
+            );
+          }
+          Monitor.Log("Restore queue data.");
+          c.queuedSchedulePaths.Clear();
+          foreach (int i in data2.queued) {
+            c.queuedSchedulePaths.Add(new KeyValuePair<int, SchedulePathDescription>(i, c.Schedule[i]));
+          }
         } else {
           Monitor.Log(string.Format("Can't find NPC {0}.", key));
         }
       }
     }
 
-    private void ShowSaved() {
-      Game1.playSound("money");
-      Game1.addHUDMessage(new HUDMessage(
-        Game1.content.LoadString("Strings\\StringsFromCSFiles:SaveGameMenu.cs.11378"),
-        HUDMessage.newQuest_type
-      ));
+    private string[] SaveShippingBin(ICollection<Item> shippingBin) {
+      StringWriter sw = new StringWriter();
+      XmlSerializer xs = new XmlSerializer(typeof(Item));
+      string[] result = new string[shippingBin.Count];
+      int pos = 0;
+      foreach (Item i in shippingBin) {
+        xs.Serialize(sw, i);
+        result[pos++] = sw.ToString();
+        sw.GetStringBuilder().Clear();
+      }
+      return result;
     }
 
-    private void RestorePlayerData(FarmerData data) {
-      Monitor.Log(string.Format("Restore player {0}({1})", Game1.player.name, Game1.player.uniqueMultiplayerID));
+    private void RestoreShippingBin(ICollection<Item> shippingBin, string[] data) {
+      XmlSerializer xs = new XmlSerializer(typeof(Item));
+      foreach (string i in data) {
+        shippingBin.Add((Item)xs.Deserialize(new StringReader(i)));
+      }
+    }
+
+    private void RestotePlayer(FarmerData data) {
+      Monitor.Log(string.Format("Restore player {0}", Game1.player.uniqueMultiplayerID));
+      // Restore actual position
       LocationRequest request = Game1.getLocationRequest(data.map);
       request.OnWarp += delegate {
         Game1.player.Position = new Vector2(data.x, data.y);
       };
       Game1.warpFarmer(request, 0, 0, data.facing);
       Game1.fadeToBlackAlpha = 1.2f;
+      // Restore swimming
       if (data.swimSuit) {
         Game1.player.changeIntoSwimsuit();
       }
