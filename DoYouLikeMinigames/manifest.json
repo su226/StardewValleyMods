@@ -1,0 +1,10 @@
+﻿{
+  "Name": "Do you like minigames?",
+  "Author": "su226",
+  "Version": "1.0.0",
+  "Description": "Play minigames everywhere by pressing a key.",
+  "UniqueID": "Su226.DoYouLikeMinigames",
+  "EntryDll": "DoYouLikeMinigames.dll",
+  "MinimumApiVersion": "3.8.0",
+  "UpdateKeys": []
+}
