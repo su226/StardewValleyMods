@@ -36,7 +36,7 @@ namespace Su226.StayUp {
 
       HarmonyInstance harmony = HarmonyInstance.Create(this.ModManifest.UniqueID);
       if (this.config.noTiredEmote) {
-        this.Monitor.Log("Tired emote supression enabled. (Requires patching game code)", LogLevel.Info);
+        this.Monitor.Log("Tired emote supression enabled. (Requires patching game code)", LogLevel.Debug);
         FarmerPatches.Init(this.Monitor);
         harmony.Patch(
           AccessTools.Method(typeof(Farmer), "doEmote", new Type[] { typeof(int) }),
@@ -141,6 +141,7 @@ namespace Su226.StayUp {
           Game1.exitActiveMenu();
         }
         Game1.activeClickableMenu = new ReadyCheckDialog("sleep", false, delegate {
+          Game1.exitActiveMenu();
           Game1.NewDay(0f);
         }, null);
       } else {
