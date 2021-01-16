@@ -46,6 +46,10 @@ namespace Su226.AnySave {
         Monitor.Log("Can't save: Menu open");
         return;
       }
+      if (Game1.currentMinigame != null) {
+        Monitor.Log("Can't save: Minigame open");
+        return;
+      }
       this.isModdedSave = true;
       if (Game1.IsMultiplayer) {
         Game1.activeClickableMenu = new ReadyCheckDialog("anysave", true, delegate {
