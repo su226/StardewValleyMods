@@ -8,12 +8,15 @@ using System;
 
 namespace Su226.DoYouLikeMinigames {
   class GameSelectMenu : IClickableMenu {
-    private int buttonHeight;
     private Rectangle[] buttons = new Rectangle[6];
-    private int offset = 0;
+    private int offset;
+    private int maxOffset;
 
     private ClickableTextureComponent upArrow;
     private ClickableTextureComponent downArrow;
+    private ClickableTextureComponent scrollBar;
+    private Rectangle scrollBarTrack;
+    private bool scrolling;
  
     private string error;
     private int errorTimer;
@@ -63,6 +66,11 @@ namespace Su226.DoYouLikeMinigames {
       600,
       true
     ) {
+      int buttonHeight = (height - 32) / buttons.Length;
+      for (int i = 0; i < buttons.Length; i++) {
+        buttons[i] = new Rectangle(0, 0, width - 32, buttonHeight);
+      }
+      maxOffset = games.Length - buttons.Length;
       upArrow = new ClickableTextureComponent(
         new Rectangle(0, 0, 44, 48),
         Game1.mouseCursors,
@@ -75,11 +83,88 @@ namespace Su226.DoYouLikeMinigames {
         new Rectangle(421, 472, 11, 12),
         4f
       );
-      buttonHeight = (height - 32) / buttons.Length;
-      for (int i = 0; i < buttons.Length; i++) {
-        buttons[i] = new Rectangle(0, 0, width - 32, buttonHeight);
-      }
+      scrollBar = new ClickableTextureComponent(
+        new Rectangle(0, 0, 24, 40),
+        Game1.mouseCursors,
+        new Rectangle(435, 463, 6, 10),
+        4f
+      );
+      scrollBarTrack = new Rectangle(
+        0,
+        0,
+        scrollBar.bounds.Width,
+        height - 140
+      );
       PlaceWidgets();
+    }
+
+    public void PlaceWidgets() {
+      for (int i = 0; i < buttons.Length; i++) {
+        buttons[i].X = xPositionOnScreen + 16;
+        buttons[i].Y = yPositionOnScreen + 16 + i * buttons[i].Height;
+      }
+      upArrow.bounds.X = xPositionOnScreen + width + 16;
+      upArrow.bounds.Y = yPositionOnScreen + 16;
+      downArrow.bounds.X = xPositionOnScreen + width + 16;
+      downArrow.bounds.Y = yPositionOnScreen + height - 64;
+      scrollBarTrack.X = upArrow.bounds.X + 12;
+      scrollBarTrack.Y = upArrow.bounds.Y + upArrow.bounds.Height + 4;
+      scrollBar.bounds.X = scrollBarTrack.X;
+      PlaceScrollBar();
+    }
+
+    public void PlaceScrollBar() {
+      scrollBar.bounds.Y = (int)((scrollBarTrack.Height - scrollBar.bounds.Height) * 1.0 * offset / maxOffset);
+      scrollBar.bounds.Y += scrollBarTrack.Y;
+    }
+
+    public bool ScrollUp() {
+      if (offset > 0) {
+        offset--;
+        PlaceScrollBar();
+        return true;
+      }
+      return false;
+    }
+
+    public bool ScrollDown() {
+      if (offset < maxOffset) {
+        offset++;
+        PlaceScrollBar();
+        return true;
+      }
+      return false;
+    }
+    
+    public override void receiveScrollWheelAction(int direction) {
+      if (direction > 0) {
+        if (ScrollUp()) {
+          Game1.playSound("shiny4");
+        }
+      } else {
+        if (ScrollDown()) {
+          Game1.playSound("shiny4");
+        }
+      }
+    }
+
+    public override void update(GameTime time) {
+      if (errorTimer > 0) {
+        if (--errorTimer == 0) {
+          error = null;
+        }
+      }
+    }
+
+    public override void gameWindowSizeChanged(Rectangle oldrect, Rectangle newrect) {
+      base.gameWindowSizeChanged(oldrect, newrect);
+      PlaceWidgets();
+    }
+
+    public override void performHoverAction(int x, int y) {
+      upArrow.tryHover(x, y);
+      downArrow.tryHover(x, y);
+      scrollBar.tryHover(x, y);
     }
 
     public override void receiveLeftClick(int x, int y, bool playSound = true) {
@@ -97,58 +182,36 @@ namespace Su226.DoYouLikeMinigames {
           break;
         }
       }
-      if (upArrow.containsPoint(x, y)) {
-        ScrollUp();
+      if (upArrow.containsPoint(x, y) && ScrollUp()) {
+        Game1.playSound("shwip");
+        upArrow.scale = upArrow.baseScale;
       }
-      if (downArrow.containsPoint(x, y)) {
-        ScrollDown();
+      if (downArrow.containsPoint(x, y) && ScrollDown()) {
+        Game1.playSound("shwip");
+        downArrow.scale = upArrow.baseScale;
       }
-    }
-    
-    public override void receiveScrollWheelAction(int direction) {
-      if (direction > 0) {
-        ScrollUp();
-      } else {
-        ScrollDown();
+      if (scrollBarTrack.Contains(x, y)) {
+        scrolling = true;
       }
     }
 
-    public override void update(GameTime time) {
-      if (errorTimer > 0) {
-        if (--errorTimer == 0) {
-          error = null;
+    public override void leftClickHeld(int x, int y) {
+      if (scrolling) {
+        int scrollTop = y - (scrollBarTrack.Y + scrollBar.bounds.Height / 2);
+        int scrollHeight = scrollBarTrack.Height - scrollBar.bounds.Height;
+        double ratio = Math.Min(Math.Max(scrollTop * 1.0 / scrollHeight, 0), 1);
+        int newOffset = (int)Math.Round(ratio * maxOffset);
+        if (newOffset != offset) {
+          Game1.playSound("shiny4");
+          offset = newOffset;
+          PlaceScrollBar();
         }
       }
     }
 
-    public override void gameWindowSizeChanged(Rectangle oldrect, Rectangle newrect) {
-      base.gameWindowSizeChanged(oldrect, newrect);
-      PlaceWidgets();
-    }
-
-    public void ScrollUp() {
-      if (offset > 0) {
-        Game1.playSound("shiny4");
-        offset--;
-      }
-    }
-
-    public void ScrollDown() {
-      if (offset < games.Length - buttons.Length) {
-        Game1.playSound("shiny4");
-        offset++;
-      }
-    }
-
-    public void PlaceWidgets() {
-      for (int i = 0; i < buttons.Length; i++) {
-        buttons[i].X = xPositionOnScreen + 16;
-        buttons[i].Y = yPositionOnScreen + 16 + i * buttonHeight;
-      }
-      upArrow.bounds.X = xPositionOnScreen + width + 16;
-      upArrow.bounds.Y = yPositionOnScreen + 16;
-      downArrow.bounds.X = xPositionOnScreen + width + 16;
-      downArrow.bounds.Y = yPositionOnScreen + height - 64;
+    public override void releaseLeftClick(int x, int y) {
+      base.releaseLeftClick(x, y);
+      scrolling = false;
     }
 
     public override void draw(SpriteBatch b) {
@@ -205,6 +268,18 @@ namespace Su226.DoYouLikeMinigames {
       }
       upArrow.draw(b);
       downArrow.draw(b);
+      IClickableMenu.drawTextureBox(
+        b,
+        Game1.mouseCursors,
+        new Rectangle(403, 383, 6, 6),
+        scrollBarTrack.X,
+        scrollBarTrack.Y,
+        scrollBarTrack.Width,
+        scrollBarTrack.Height,
+        Color.White,
+        4f
+      );
+      scrollBar.draw(b);
       drawMouse(b);
     }
   }

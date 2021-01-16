@@ -21,6 +21,16 @@ namespace Su226.DoYouLikeMinigames {
       if (e.Button != M.Config.key) {
         return;
       }
+      if (!Game1.player.CanMove) {
+        return;
+      }
+      if (Game1.activeClickableMenu != null) {
+        return;
+      }
+      if (Game1.currentMinigame != null) {
+        return;
+      }
+      Game1.playSound("bigSelect");
       Game1.activeClickableMenu = new GameSelectMenu();
     }
   }

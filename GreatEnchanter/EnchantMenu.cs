@@ -90,7 +90,6 @@ namespace Su226.GreatEnchanter {
       scrollBar.bounds.Y += scrollBarTrack.Y;
     }
 
-
     public bool ScrollUp() {
       if (offset > 0) {
         offset--;
