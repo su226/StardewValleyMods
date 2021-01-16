@@ -21,15 +21,12 @@ namespace Su226.GreatEnchanter {
         return;
       }
       if (!Game1.player.CanMove) {
-        Monitor.Log("Can't save: Can't move");
         return;
       }
       if (Game1.activeClickableMenu != null) {
-        Monitor.Log("Can't save: Menu open");
         return;
       }
       if (Game1.currentMinigame != null) {
-        Monitor.Log("Can't save: Minigame open");
         return;
       }
       Game1.playSound("bigSelect");
