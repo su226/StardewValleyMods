@@ -1,14 +1,10 @@
 ﻿using System;
 using Microsoft.Xna.Framework;
-using StardewModdingAPI;
 using StardewModdingAPI.Events;
 using StardewValley;
 
 namespace Su226.StayUp {
   class LightTransition {
-    IMonitor monitor;
-    Config config;
-
     private readonly int morningBegin;
     private readonly int morningDuration;
 
@@ -17,16 +13,14 @@ namespace Su226.StayUp {
     private Color rainLightColor = new Color(76, 60, 24, 76);
     private Color rainDarkColor = new Color(237, 186, 74, 237);
 
-    public LightTransition(IModHelper helper, IMonitor monitor, Config config) {
-      this.config = config;
-      this.monitor = monitor;
-      this.morningBegin = config.morningLight / 100 * 60 + config.morningLight % 100;
+    public LightTransition() {
+      this.morningBegin = M.Config.morningLight / 100 * 60 + M.Config.morningLight % 100;
       this.morningDuration = 360 - this.morningBegin;
-      helper.Events.GameLoop.UpdateTicked += this.OnUpdateTicked;
+      M.Helper.Events.GameLoop.UpdateTicked += this.OnUpdateTicked;
     }
 
     private void OnUpdateTicked(object o, UpdateTickedEventArgs e) {
-      if (Game1.timeOfDay < this.config.morningLight) {
+      if (Game1.timeOfDay < M.Config.morningLight) {
         Game1.outdoorLight = Game1.isRaining ? this.rainDarkColor : this.darkColor;
       } else if (Game1.timeOfDay < 600) {
         double minute = Game1.timeOfDay / 100 * 60
@@ -36,7 +30,7 @@ namespace Su226.StayUp {
         Game1.outdoorLight = this.GetAverageColor(
           Game1.isRaining ? this.rainLightColor : this.lightColor,
           Game1.isRaining ? this.rainDarkColor : this.darkColor,
-          Math.Pow(minute / this.morningDuration, this.config.morningLightPower)
+          Math.Pow(minute / this.morningDuration, M.Config.morningLightPower)
         );
       } else if (Game1.timeOfDay == 600) {
         Game1.outdoorLight = Game1.isRaining ? this.rainLightColor : this.lightColor;

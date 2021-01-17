@@ -1,6 +1,4 @@
-﻿using Harmony;
-using System;
-using Microsoft.Xna.Framework;
+﻿using Microsoft.Xna.Framework;
 using StardewModdingAPI;
 using StardewModdingAPI.Events;
 using StardewValley;
@@ -8,8 +6,12 @@ using StardewValley.Menus;
 using StardewValley.Characters;
 
 namespace Su226.StayUp {
-  public class StayUp : Mod {
-    private Config config;
+  class M {
+    public static IModHelper Helper;
+    public static IMonitor Monitor;
+    public static Config Config;
+  }
+  class StayUp : Mod {
     private LightTransition light;
 
     private bool canCallNewDay; // Prevent sleep repeatedly.
@@ -28,40 +30,32 @@ namespace Su226.StayUp {
     private int horseFacing;
 
     public override void Entry(IModHelper helper) {
-      this.Monitor.Log("Starting.");
-      this.config = helper.ReadConfig<Config>();
+      Monitor.Log("Starting.");
+      M.Helper = helper;
+      M.Monitor = Monitor;
+      M.Config = helper.ReadConfig<Config>();
 
       helper.Events.GameLoop.DayStarted += this.OnDayStarted;
       helper.Events.GameLoop.TimeChanged += this.OnTimeChanged;
 
-      HarmonyInstance harmony = HarmonyInstance.Create(this.ModManifest.UniqueID);
-      if (this.config.noTiredEmote) {
-        this.Monitor.Log("Tired emote supression enabled. (Requires patching game code)", LogLevel.Debug);
-        FarmerPatches.Init(this.Monitor);
-        harmony.Patch(
-          AccessTools.Method(typeof(Farmer), "doEmote", new Type[] { typeof(int) }),
-          new HarmonyMethod(typeof(FarmerPatches), "PreDoEmote")
-        );
+      if (M.Config.editFishes) {
+        Monitor.Log("Fish editing enabled.");
+        helper.Content.AssetEditors.Add(new FishEditor());
       }
 
-      if (this.config.editFishes) {
-        this.Monitor.Log("Fish editing enabled.");
-        helper.Content.AssetEditors.Add(new FishEditor(this.Monitor));
-      }
-
-      if (this.config.morningLight != -1) {
-        this.Monitor.Log("Light transition enabled.");
-        this.light = new LightTransition(helper, this.Monitor, this.config);
+      if (M.Config.morningLight != -1) {
+        Monitor.Log("Light transition enabled.");
+        this.light = new LightTransition();
       }
     }
 
     private void OnDayStarted(object o, DayStartedEventArgs e) {
       if (this.restoreData) {
-        if (this.config.keepFarmer) {
-          this.Monitor.Log("Restore player position.");
+        if (M.Config.keepFarmer) {
+          Monitor.Log("Restore player position.");
           LocationRequest request = Game1.getLocationRequest(map);
           request.OnWarp += delegate {
-            Game1.fadeToBlackAlpha = this.config.smoothSaving ? 1 : -.2f; // Hide fading from black
+            Game1.fadeToBlackAlpha = M.Config.smoothSaving ? 1 : -.2f; // Hide fading from black
             Game1.player.Position = this.pos; // Set player's float position
             if (this.sitted != null) { // Sit down
               this.sitted.AddSittingFarmer(Game1.player);
@@ -75,7 +69,7 @@ namespace Su226.StayUp {
             Game1.getFarm().characters.Remove(Game1.getFarm().getCharacterFromName(Game1.player.horseName));
           }
         } else {
-          this.Monitor.Log("Discard player position.");
+          Monitor.Log("Discard player position.");
           Horse mountedHorse = Game1.player.mount;
           if (mountedHorse != null) { // Dismount and remove horse
             mountedHorse.dismount();
@@ -84,16 +78,16 @@ namespace Su226.StayUp {
           Game1.player.changeOutOfSwimSuit(); // Reset from bathhub
           Game1.player.swimming.Value = false;
         }
-        if (this.config.keepStamina) {
-          this.Monitor.Log("Restore player stamina.");
+        if (M.Config.keepStamina) {
+          Monitor.Log("Restore player stamina.");
           Game1.player.stamina = this.stamina;
         }
-        if (this.config.keepHealth) {
-          this.Monitor.Log("Restore player health.");
+        if (M.Config.keepHealth) {
+          Monitor.Log("Restore player health.");
           Game1.player.health = this.health;
         }
-        if (this.config.keepHorse && this.horse != null) {
-          this.Monitor.Log("Restore horse position.");
+        if (M.Config.keepHorse && this.horse != null) {
+          Monitor.Log("Restore horse position.");
           Game1.warpCharacter(this.horse, this.horseMap, this.horsePos / 64);
           this.horse.faceDirection(this.horseFacing);
         }
@@ -103,13 +97,17 @@ namespace Su226.StayUp {
     }
 
     private void OnTimeChanged(object o, TimeChangedEventArgs e) {
-      if (Game1.dayTimeMoneyBox.timeShakeTimer != 0 && this.config.noTimeShake) {
-        this.Monitor.Log("Time shake supressed.");
+      if (Game1.dayTimeMoneyBox.timeShakeTimer != 0 && M.Config.noTimeShake) {
+        Monitor.Log("Time shake supressed.");
         Game1.dayTimeMoneyBox.timeShakeTimer = 0;
       }
-      if (Game1.timeOfDay == 2550 && this.config.stayUp) {
-        this.Monitor.Log("Stay up.");
-        this.canCallNewDay = this.config.newDayAt6Am;
+      if ((e.NewTime == 2400 || e.NewTime == 2500) && M.Config.noTiredEmote) {
+        Monitor.Log("Tired emote supressed.");
+        Game1.player.isEmoting = false;
+      }
+      if (e.NewTime == 2550 && M.Config.stayUp) {
+        Monitor.Log("Stay up.");
+        this.canCallNewDay = M.Config.newDayAt6Am;
         Game1.timeOfDay = 150;
       }
       if (e.NewTime == 600 && this.canCallNewDay) {
@@ -118,7 +116,7 @@ namespace Su226.StayUp {
     }
 
     private void NewDayStayUp() {
-      this.Monitor.Log("Save player data.");
+      Monitor.Log("Save player data.");
       this.restoreData = true;
       this.map = Game1.player.currentLocation.NameOrUniqueName;
       this.pos = Game1.player.Position;
@@ -128,12 +126,12 @@ namespace Su226.StayUp {
       this.health = Game1.player.health;
       this.horse = Game1.getCharacterFromName<Horse>(Game1.player.horseName, false);
       if (this.horse != null) {
-        this.Monitor.Log("Save horse data.");
+        Monitor.Log("Save horse data.");
         this.horseMap = this.horse.currentLocation.NameOrUniqueName;
         this.horsePos = this.horse.Position;
         this.horseFacing = this.horse.FacingDirection;
       }
-      this.Monitor.Log("Start new day.");
+      Monitor.Log("Start new day.");
       Game1.player.passedOut = true;
       if (Game1.IsMultiplayer) {
         if (Game1.activeClickableMenu != null) {
@@ -146,7 +144,7 @@ namespace Su226.StayUp {
         }, null);
       } else {
         Game1.NewDay(0f);
-        Game1.fadeToBlackAlpha = this.config.smoothSaving ? 0 : 1.2f;
+        Game1.fadeToBlackAlpha = M.Config.smoothSaving ? 0 : 1.2f;
       }
     }
   }
