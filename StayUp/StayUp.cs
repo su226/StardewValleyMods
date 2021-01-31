@@ -66,6 +66,7 @@ namespace Su226.StayUp {
               Game1.player.isSitting.Value = true;
             }
           };
+          // Place player at the entrance if it's mine or dungeon.
           if (request.Location is VolcanoDungeon dungeon) {
             this.pos = null;
             Point point = dungeon.startPosition.Value;
@@ -146,17 +147,14 @@ namespace Su226.StayUp {
       Monitor.Log("Start new day.");
       Game1.player.passedOut = true;
       if (Game1.IsMultiplayer) {
-        if (Game1.activeClickableMenu != null) {
-          Game1.activeClickableMenu.emergencyShutDown();
-          Game1.exitActiveMenu();
-        }
+        Game1.activeClickableMenu?.emergencyShutDown();
         Game1.activeClickableMenu = new ReadyCheckDialog("sleep", false, delegate {
-          Game1.exitActiveMenu();
+          Game1.dialogueUp = false; // Close "Go to bed" dialogue to prevent stuck.
           Game1.NewDay(0f);
         }, null);
       } else {
         Game1.NewDay(0f);
-        Game1.fadeToBlackAlpha = M.Config.smoothSaving ? 0 : 1.2f;
+        Game1.fadeToBlackAlpha = M.Config.smoothSaving ? 0f : 1.2f;
       }
     }
   }
