@@ -4,6 +4,7 @@ using StardewModdingAPI.Events;
 using StardewValley;
 using StardewValley.Menus;
 using StardewValley.Characters;
+using StardewValley.Locations;
 
 namespace Su226.StayUp {
   class M {
@@ -18,7 +19,7 @@ namespace Su226.StayUp {
     private bool restoreData;
 
     private string map;
-    private Vector2 pos;
+    private Vector2? pos;
     private int facing;
     private ISittable sitted;
     private float stamina;
@@ -56,14 +57,25 @@ namespace Su226.StayUp {
           LocationRequest request = Game1.getLocationRequest(map);
           request.OnWarp += delegate {
             Game1.fadeToBlackAlpha = M.Config.smoothSaving ? 1 : -.2f; // Hide fading from black
-            Game1.player.Position = this.pos; // Set player's float position
+            if (this.pos != null) { // Restore exact position if it's not mine or dungeon.
+              Game1.player.Position = this.pos.Value;
+            }
             if (this.sitted != null) { // Sit down
               this.sitted.AddSittingFarmer(Game1.player);
               Game1.player.sittingFurniture = this.sitted;
               Game1.player.isSitting.Value = true;
             }
           };
-          Game1.warpFarmer(request, 0, 0, this.facing);
+          if (request.Location is VolcanoDungeon dungeon) {
+            this.pos = null;
+            Point point = dungeon.startPosition.Value;
+            Game1.warpFarmer(request, point.X, point.Y, 2);
+          } else if (map.StartsWith("UndergroundMine")) {
+            this.pos = null;
+            Game1.warpFarmer(request, 6, 6, 2);
+          } else {
+            Game1.warpFarmer(request, 0, 0, this.facing);
+          }
           Game1.fadeToBlackAlpha = 1.2f; // Hide fading to black
           if (Game1.player.mount != null) { // Remove the orphaned horse.
             Game1.getFarm().characters.Remove(Game1.getFarm().getCharacterFromName(Game1.player.horseName));
