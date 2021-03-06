@@ -21,6 +21,7 @@ namespace Su226.AnySave {
       helper.Events.Multiplayer.ModMessageReceived += this.OnModMessageReceived;
       helper.Events.GameLoop.Saved += this.OnSaved;
       helper.Events.GameLoop.SaveLoaded += this.OnSaveLoaded;
+      helper.Events.GameLoop.DayEnding += this.OnDayEnding;
     }
 
     public override object GetApi() {
@@ -75,10 +76,14 @@ namespace Su226.AnySave {
         if (f.mount != null) {
           M.Api.SaveNpc(f.mount);
         }
-        if (Game1.player.team.useSeparateWallets) {
+        if (f.team.useSeparateWallets) {
           M.Api.SaveShippingBin(f);
         }
-        M.Api.SavePlayer(f);
+        if (f.isActive()) {
+          M.Api.SavePlayer(f);
+        } else {
+          M.Api.GetAndClearPlayerData(f.UniqueMultiplayerID);
+        }
       }
       if (!Game1.player.team.useSeparateWallets) {
         M.Api.SaveShippingBin(Game1.player);
@@ -141,6 +146,13 @@ namespace Su226.AnySave {
         }
       } else {
         M.Api.RestoreShippingBin(Game1.player);
+      }
+    }
+
+    private void OnDayEnding(object o, DayEndingEventArgs e) {
+      // Clear unused player data when sleeping.
+      foreach (Farmer f in Game1.getAllFarmers()) {
+        M.Api.GetAndClearPlayerData(f.UniqueMultiplayerID);
       }
     }
   }
