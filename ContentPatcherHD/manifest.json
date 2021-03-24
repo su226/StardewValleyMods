@@ -1,0 +1,14 @@
+﻿{
+  "Name": "Content Patcher HD",
+  "Author": "Su226",
+  "Version": "1.0.0",
+  "Description": "Allow content packs scale texture to 4x via Content Patcher.",
+  "UniqueID": "Su226.ContentPatcherHD",
+  "EntryDll": "ContentPatcherHD.dll",
+  "Dependencies": [
+    {
+      "UniqueID": "Pathoschild.ContentPatcher"
+    }
+  ],
+  "UpdateKeys": []
+}
