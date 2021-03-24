@@ -4,6 +4,7 @@ using StardewValley;
 using StardewValley.BellsAndWhistles;
 using StardewValley.Menus;
 using System;
+using System.Linq;
 
 namespace Su226.GreatEnchanter {
   class EnchantMenu : IClickableMenu {
@@ -109,25 +110,27 @@ namespace Su226.GreatEnchanter {
     }
 
     public void UpdateSelected() {
-      Item item = Game1.player.items.Count > selected ? Game1.player.items[selected] : null;
+      Item item = Game1.player.items.ElementAtOrDefault(selected);
       for (int i = 0; i < enchantments.Length; i++) {
         incompatible[i] = !enchantments[i].CanApplyTo(item);
       }
     }
 
-    public bool HasEnchantment(int index) {
-      Item item = Game1.player.items.Count > selected ? Game1.player.items[selected] : null;
+    public BaseEnchantment GetEnchantment(Item item, BaseEnchantment ench) {
       if (item is Tool tool) {
-        return tool.enchantments.Contains(enchantments[index]);
+        return tool.enchantments.FirstOrDefault(e => e.GetName() == ench.GetName());
       }
-      return false;
+      return null;
+    }
+
+    public bool HasEnchantment(int index) {
+      return GetEnchantment(Game1.player.items.ElementAtOrDefault(selected), enchantments[index]) != null;
     }
 
     public override void gameWindowSizeChanged(Rectangle oldrect, Rectangle newrect) {
       base.gameWindowSizeChanged(oldrect, newrect);
       PlaceWidgets();
     }
-
 
     public override void performHoverAction(int x, int y) {
       upArrow.tryHover(x, y);
@@ -139,12 +142,12 @@ namespace Su226.GreatEnchanter {
     public override void receiveLeftClick(int x, int y, bool playSound) {
       Item item = Game1.player.items.Count > selected ? Game1.player.items[selected] : null;
       for (int i = 0; i < buttons.Length; i++) {
-        PlaceScrollBar();
         if (buttons[i].Contains(x, y)) {
           if (item is Tool tool) {
             Game1.playSound("smallSelect");
-            if (tool.enchantments.Contains(enchantments[i + offset])) {
-              tool.enchantments.Remove(enchantments[i + offset]);
+            BaseEnchantment ench = GetEnchantment(tool, enchantments[i + offset]);
+            if (ench != null) {
+              tool.enchantments.Remove(ench);
             } else {
               tool.enchantments.Add(enchantments[i + offset]);
             }
@@ -155,13 +158,16 @@ namespace Su226.GreatEnchanter {
       if (upArrow.containsPoint(x, y) && ScrollUp()) {
         Game1.playSound("shwip");
         upArrow.scale = upArrow.baseScale;
+        return;
       }
       if (downArrow.containsPoint(x, y) && ScrollDown()) {
         Game1.playSound("shwip");
         downArrow.scale = upArrow.baseScale;
+        return;
       }
       if (scrollBarTrack.Contains(x, y)) {
         scrolling = true;
+        return;
       }
       for (int i = 0; i < 36; i++) {
         if (inventory.inventory[i].containsPoint(x, y)) {
@@ -203,7 +209,6 @@ namespace Su226.GreatEnchanter {
         }
       }
     }
-
 
     public override void draw(SpriteBatch b) {
       if (!Game1.options.showMenuBackground) {
