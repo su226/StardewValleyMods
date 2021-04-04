@@ -1,11 +1,11 @@
 ﻿namespace Su226.AnySave {
-  class PathData {
+  public class PathData {
     public string map;
     public int x;
     public int y;
     public int facing;
   }
-  class CharacterData {
+  public class CharacterData {
     public string map;
     public float x;
     public float y;
@@ -13,7 +13,7 @@
     public PathData target;
     public int[] queued;
   }
-  class FarmerData {
+  public class FarmerData {
     public string map;
     public float x;
     public float y;
@@ -22,7 +22,7 @@
     public bool swimSuit;
     public string horse;
   }
-  class TimeData {
+  public class TimeData {
     public int time;
   }
 }
