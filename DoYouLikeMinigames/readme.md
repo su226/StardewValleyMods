@@ -12,7 +12,7 @@ Press G to show minigames menu.
 
 ## Config
 
-```json
+```jsonc
 {
   "key": "G", // The key to show minigames menu.
   "checkCinema": false, // Crane cannot be played when there's no cinema.

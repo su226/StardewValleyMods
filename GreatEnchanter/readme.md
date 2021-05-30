@@ -12,7 +12,7 @@ Press H to show enchant menu.
 
 ## Config
 
-```json
+```jsonc
 {
   "key": "H" // The key to show enchant menu.
 }

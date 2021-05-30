@@ -14,7 +14,7 @@ NOTE: It's unavailable when interface opened, playing minigame and festivals. In
 
 ## Config
 
-```json
+```jsonc
 {
   "saveButton": "K" // The key to save game.
 }

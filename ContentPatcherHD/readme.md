@@ -12,7 +12,7 @@ Just add `ScaleRequests` to content pack's `content.json`.
 
 ⚠️ Currently it only supports `EditImage`, not `Load`. 
 
-```json
+```jsonc
 {
   "ScaleRequests": [
     "LooseSprites/Cursors", // Textures here will be scaled to 4x.
